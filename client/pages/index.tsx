@@ -11,8 +11,8 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import { useCollectionData } from "react-firebase-hooks/firestore";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
+//config
 const fireApp: FirebaseApp = firebase.initializeApp({
-  //config
   apiKey: "AIzaSyDogrrubQi6SFXiYvddOtMw1kHBArYaX9c",
   authDomain: "clone-chatgpt-4128e.firebaseapp.com",
   projectId: "clone-chatgpt-4128e",
@@ -22,6 +22,7 @@ const fireApp: FirebaseApp = firebase.initializeApp({
   measurementId: "G-Z7QLSCSZSC",
 });
 
+//define Message and ChatRoom
 const auth = getAuth();
 const firestore = firebase.firestore();
 interface Message {
@@ -38,6 +39,7 @@ interface ChatRoom {
   createAt: firebase.firestore.FieldValue;
 }
 
+//Main function
 function index() {
   return (
     <div className="flex  h-screen">
@@ -113,19 +115,28 @@ function ChatRooms() {
           Start New Chat
         </button>
       </div>
-
-      <div>
-        {"test: "}
-        {roomhistory && roomhistory.map((room) => <ChatRoomLayout {...room} />)}
+      <div className=" leading-8 mx-4">
+        {" ChatRooms: "}
+        {roomhistory &&
+          roomhistory.map((room) => (
+            <ChatRoomLayout
+              newChat={newChat}
+              setNewChat={setNewChat}
+              chatRoom={room}
+            />
+          ))}
       </div>
       <div>
         {newChat && (
-          <div className="fixed right-0 top-0 h-full w-4/5 bg-white shadow-lg">
-            <ChatRoom {...newRoom} />
-            <button onClick={handleChatClose}>Close Chat</button>
-
-            {/* {newRoom.name}
-            {newRoom.id} */}
+          <div>
+            <div className="fixed right-0 top-0 h-full w-4/5 bg-white shadow-lg">
+              <div className="text-blue-300"> New chat</div>
+              <ChatRoom
+                newChat={newChat}
+                setNewChat={setNewChat}
+                chatRoom={newRoom}
+              />
+            </div>
           </div>
         )}
       </div>
@@ -133,29 +144,26 @@ function ChatRooms() {
     </div>
   );
 }
-function SignIn() {
-  return <div>Signin</div>;
-}
 
-function ChatRoom(props: ChatRoom) {
-  const [message, setMessage] = useState("Loading");
-  const [people, setPeople] = useState([]);
+//For each individaul room
+function ChatRoom({ newChat, setNewChat, chatRoom, ...props }) {
   const [chathistory, setChathistory] = useState<Message[]>([]);
-
-  // const messagesRef = firestore.collection("messages");
 
   const getChatList = async () => {
     try {
       const messagesSnapshot = await firestore
         .collection("chatRooms")
-        .doc(props.id)
+        .doc(chatRoom.id)
         .get();
-      console.log(messagesSnapshot);
 
       const chatRoomData = messagesSnapshot.data();
       const chatMessages = chatRoomData.messages;
 
+      const chatRoomsRef = firestore.collection("chatRooms").doc(chatRoom.id);
+      if (chatMessages.length != 0)
+        await chatRoomsRef.update({ name: chatMessages[0].text });
       setChathistory(chatMessages);
+      console.log(chatMessages);
     } catch (err) {
       console.log(err);
     }
@@ -163,22 +171,8 @@ function ChatRoom(props: ChatRoom) {
 
   useEffect(() => {
     getChatList();
-  }, []);
-  // useEffect(() => {
-  //   fetch("http://localhost:8080/api/home")
-  //     .then((response) => response.json())
-  //     .then((data) => {
-  //       // console.log(data);
-  //       setMessage(data.message);
-  //       setPeople(data.people);
-  //       console.log(data.people);
-  //     })
-  //     .catch((error) => {
-  //       console.log(error);
-  //     });
-  // }, []);
+  }, [chatRoom.id]);
 
-  //form data
   const [formData, setFormData] = useState({
     input: "",
   });
@@ -213,7 +207,7 @@ function ChatRoom(props: ChatRoom) {
       console.log("POST response:", responseData0);
       const messagesSnapshot = await firestore
         .collection("chatRooms")
-        .doc(props.id)
+        .doc(chatRoom.id)
         .get();
       // console.log(messagesSnapshot);
 
@@ -223,19 +217,19 @@ function ChatRoom(props: ChatRoom) {
       const newMessage = {
         id: "Input",
         text: input,
-        user: "Owner",
+        user: "You",
         createdAt: new Date(),
       };
       const newResponse = {
         id: "Hello",
         text: responseData0,
-        user: "Hellen",
+        user: "ChatGPT",
         createdAt: new Date(),
       };
       //firestore.FieldValue.serverTimestamp() is not allowed to use inside array
 
       const updateMessages = [...chatMessages, newMessage, newResponse];
-      const chatRoomsRef = firestore.collection("chatRooms").doc(props.id);
+      const chatRoomsRef = firestore.collection("chatRooms").doc(chatRoom.id);
 
       await chatRoomsRef.update({ messages: updateMessages });
 
@@ -248,10 +242,9 @@ function ChatRoom(props: ChatRoom) {
 
   return (
     <div>
-      <div className="w-4/5 bg-white flex-col place-items-end overflow-y-scroll">
+      <div>
         <div className="h-4/5 flex-1 py-2">
           <div className="flex flex-col mb-2">
-            {"response: "}
             {chathistory && chathistory.map((msg) => <ChatMessage {...msg} />)}
           </div>
         </div>
@@ -286,34 +279,48 @@ function ChatRoom(props: ChatRoom) {
 function ChatMessage(props: Message) {
   return (
     <>
-      <div className=" p-2 rounded mb-2">
-        <p style={{ color: props.user === "Owner" ? "blue" : "black" }}>
+      <div className=" p-2 rounded mb-2 leading-5">
+        <span
+          className="font-bold"
+          style={{ color: props.user === "You" ? "blue" : "black" }}
+        >
+          {props.user}:{" "}
+        </span>
+
+        <span
+          className="font-normal"
+          style={{ color: props.user === "You" ? "blue" : "black" }}
+        >
           {props.text}
-        </p>
+        </span>
       </div>
     </>
   );
 }
-function ChatRoomLayout(props: ChatRoom) {
+function ChatRoomLayout({ newChat, setNewChat, chatRoom, ...props }) {
   const [clicked, setClicked] = useState(false);
   const onClickHandler: MouseEventHandler<HTMLAnchorElement> = async () => {
-    console.log(props.name);
+    console.log(chatRoom.name);
+    setNewChat(false);
     setClicked(true);
   };
   return (
     <>
       <div>
         <a
-          // href={`/${props.name}`}
-          className="p-2 text-blue-600"
+          className="p-2 text-blue-600 hover:text-blue-800 hover:bg-yellow-100 rounded cursor-pointer"
           onClick={onClickHandler}
         >
-          {props.name}
+          {chatRoom.name}
         </a>
         <div>
           {clicked && (
             <div className="fixed right-0 top-0 h-full w-4/5 bg-white shadow-lg">
-              <ChatRoom {...props} />
+              <ChatRoom
+                newChat={clicked}
+                setNewChat={setClicked}
+                chatRoom={chatRoom}
+              />
             </div>
           )}
         </div>
